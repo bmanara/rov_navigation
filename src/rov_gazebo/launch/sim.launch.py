@@ -3,11 +3,12 @@
 Does NOT start control or localization; see rov_bringup for the full stacks.
 """
 import os
+import subprocess
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, EmitEvent, ExecuteProcess,
-                            RegisterEventHandler, SetEnvironmentVariable)
+from launch.actions import (DeclareLaunchArgument, EmitEvent, ExecuteProcess, LogInfo,
+                            OpaqueFunction, RegisterEventHandler, SetEnvironmentVariable)
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
@@ -33,15 +34,36 @@ def generate_launch_description():
 
     # `--force-version 8` pins Gazebo Harmonic even when a newer Gazebo
     # (e.g. Jetty) is installed alongside it and is the CLI default.
-    gz_common = ['gz', 'sim', '--force-version', '8', '-r', '-v', '3']
-    gz_with_gui = ExecuteProcess(
-        cmd=gz_common + ['--render-engine-server', render_engine,
-                         '--render-engine-gui', render_engine, world],
+    #
+    # Server (-s) and GUI (-g) run as separate processes on purpose. Plain
+    # `gz sim` forks the server into its own process group; if launch has to
+    # SIGKILL the parent during a slow shutdown, that server is orphaned and
+    # keeps running, and the next launch then talks to two `pool` worlds at
+    # once (ROV appears in random places). With -s / -g, gz runs in-process,
+    # so launch's signals reach the real server and GUI.
+    gz_common = ['gz', 'sim', '--force-version', '8', '-v', '3']
+    gz_server_cmd = gz_common + ['-s', '-r', '--render-engine-server', render_engine]
+    gz_server = ExecuteProcess(
+        cmd=gz_server_cmd + [world], output='screen', sigterm_timeout='10',
+        condition=IfCondition(LaunchConfiguration('gui')))
+    gz_server_headless = ExecuteProcess(
+        cmd=gz_server_cmd + ['--headless-rendering', world], output='screen',
+        sigterm_timeout='10', condition=UnlessCondition(LaunchConfiguration('gui')))
+    gz_gui = ExecuteProcess(
+        cmd=gz_common + ['-g', '--render-engine-gui', render_engine],
         output='screen', condition=IfCondition(LaunchConfiguration('gui')))
-    gz_headless = ExecuteProcess(
-        cmd=gz_common + ['-s', '--headless-rendering',
-                         '--render-engine-server', render_engine, world],
-        output='screen', condition=UnlessCondition(LaunchConfiguration('gui')))
+
+    def warn_stale_server(context):
+        # Orphans from older launches / crashes (e.g. kill -9) still interfere.
+        try:
+            out = subprocess.run(['pgrep', '-af', '^gz sim'], capture_output=True,
+                                 text=True, check=False).stdout.strip()
+        except OSError:
+            return []
+        if not out:
+            return []
+        return [LogInfo(msg='WARNING: Gazebo is already running; the ROV may spawn into '
+                            'the stale world. Stop it with: pkill -f "^gz sim"\n' + out)]
 
     spawn = Node(
         package='ros_gz_sim', executable='create', output='screen',
@@ -70,9 +92,10 @@ def generate_launch_description():
         parameters=[os.path.join(gazebo_share, 'config', 'sonar.yaml'),
                     {'world_file': world, 'use_sim_time': use_sim_time}])
 
+    # Closing the GUI window or the server exiting ends the whole launch.
     shutdown_on_gz_exit = [
         RegisterEventHandler(OnProcessExit(target_action=gz, on_exit=[EmitEvent(event=Shutdown())]))
-        for gz in (gz_with_gui, gz_headless)]
+        for gz in (gz_server, gz_server_headless, gz_gui)]
 
     return LaunchDescription([
         DeclareLaunchArgument('world', default_value=os.path.join(gazebo_share, 'worlds', 'pool.sdf')),
@@ -88,6 +111,7 @@ def generate_launch_description():
         DeclareLaunchArgument('z', default_value='-0.5'),
         DeclareLaunchArgument('yaw', default_value='0.0'),
         SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', resource_path),
-        gz_with_gui, gz_headless, *shutdown_on_gz_exit,
+        OpaqueFunction(function=warn_stale_server),
+        gz_server, gz_server_headless, gz_gui, *shutdown_on_gz_exit,
         spawn, bridge, rsp, sensors, sonar,
     ])
