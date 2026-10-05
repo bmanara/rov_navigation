@@ -1,0 +1,81 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Reference Frame: <Fixed Frame>
+      Plane: XY
+      Plane Cell Count: 20
+      Cell Size: 1
+      Offset: {X: 0, Y: 0, Z: -4}
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Durability Policy: Transient Local
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Names: false
+      Marker Scale: 0.3
+    - Class: rviz_default_plugins/Odometry
+      Name: EKF odometry
+      Enabled: true
+      Topic:
+        Value: /odometry/filtered
+      Keep: 200
+      Shape:
+        Value: Arrow
+        Color: 0; 120; 255
+        Shaft Length: 0.3
+        Head Length: 0.1
+        Shaft Radius: 0.02
+        Head Radius: 0.05
+      Covariance:
+        Value: false
+    - Class: rviz_default_plugins/Odometry
+      Name: Ground truth odometry
+      Enabled: true
+      Topic:
+        Value: /odometry/ground_truth
+      Keep: 200
+      Shape:
+        Value: Arrow
+        Color: 0; 200; 0
+        Shaft Length: 0.3
+        Head Length: 0.1
+        Shaft Radius: 0.02
+        Head Radius: 0.05
+      Covariance:
+        Value: false
+    - Class: rviz_default_plugins/LaserScan
+      Name: Sonar
+      Enabled: true
+      Topic:
+        Value: /sensors/sonar
+      Style: Spheres
+      Size (m): 0.06
+      Color Transformer: FlatColor
+      Color: 255; 200; 0
+    - Class: rviz_default_plugins/Image
+      Name: Camera
+      Enabled: true
+      Topic:
+        Value: /sensors/camera/image_raw
+  Global Options:
+    Fixed Frame: odom
+    Background Color: 30; 30; 40
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 6
+      Focal Point: {X: 0, Y: 0, Z: -0.5}
+      Pitch: 0.5
+      Yaw: 3.6
+      Target Frame: base_link

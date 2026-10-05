@@ -1,0 +1,55 @@
+# Thruster geometry and limits: the single source of truth for the allocator.
+#
+# Frame: base_link (REP-103: x forward, y left, z up), SI units.
+# position:  thruster centre of thrust [m]
+# direction: unit vector along which POSITIVE thrust pushes the vehicle
+#
+# The Gazebo model (models/rov/model.sdf) must match this file: each
+# thrusterN link sits at `position` and thrusterN_joint's axis is `direction`.
+# test/test_model_consistency.py enforces that.
+#
+# Layout (8 thrusters, BlueROV2-Heavy-like, fully actuated in 6 DOF):
+#   T1..T4 horizontal, vectored at 45 deg  -> surge, sway, yaw
+#   T5..T8 vertical                         -> heave, roll, pitch
+#
+#        +x (forward)
+#     T2 /   \ T1        T6 o     o T5    (verticals, outboard)
+#       |     |
+#     T4 \   / T3        T8 o     o T7
+#
+thruster_allocator:
+  ros__parameters:
+    thruster_names: [thruster1, thruster2, thruster3, thruster4,
+                     thruster5, thruster6, thruster7, thruster8]
+
+    # Per-thruster limits [N]. T200-class thruster at ~16 V, derated.
+    max_forward_thrust: 40.0
+    max_reverse_thrust: 30.0
+
+    # Gazebo Thruster-system command topic pattern; {name} -> thruster name.
+    command_topic_pattern: /model/rov/joint/{name}_joint/cmd_thrust
+
+    thruster1:  # front-right horizontal
+      position: [0.15, -0.11, 0.0]
+      direction: [0.70710678, 0.70710678, 0.0]
+    thruster2:  # front-left horizontal
+      position: [0.15, 0.11, 0.0]
+      direction: [0.70710678, -0.70710678, 0.0]
+    thruster3:  # rear-right horizontal
+      position: [-0.15, -0.11, 0.0]
+      direction: [0.70710678, -0.70710678, 0.0]
+    thruster4:  # rear-left horizontal
+      position: [-0.15, 0.11, 0.0]
+      direction: [0.70710678, 0.70710678, 0.0]
+    thruster5:  # front-right vertical
+      position: [0.12, -0.22, 0.0]
+      direction: [0.0, 0.0, 1.0]
+    thruster6:  # front-left vertical
+      position: [0.12, 0.22, 0.0]
+      direction: [0.0, 0.0, 1.0]
+    thruster7:  # rear-right vertical
+      position: [-0.12, -0.22, 0.0]
+      direction: [0.0, 0.0, 1.0]
+    thruster8:  # rear-left vertical
+      position: [-0.12, 0.22, 0.0]
+      direction: [0.0, 0.0, 1.0]

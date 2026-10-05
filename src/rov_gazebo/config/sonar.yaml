@@ -1,0 +1,23 @@
+# Emulated forward-looking multibeam sonar (scripts/sonar_emulator.py).
+# Roughly a small imaging FLS (e.g. Oculus M750d-class at low frequency),
+# simplified to a range-only LaserScan. world_file is set by the launch file.
+sonar_emulator:
+  ros__parameters:
+    frame_id: sonar_link
+    rate: 10.0                    # [Hz]
+    horizontal_fov_deg: 130.0
+    num_beams: 64
+    vertical_aperture_deg: 20.0   # beam height
+    # Rays per beam = num_azimuth_rays x num_elevation_rays. 41 elevation rays
+    # = ~9 cm spacing at 10 m, so the 10 cm gate crossbar/posts aren't missed.
+    # Cost ~10 ms/scan for the pool; lower these if CPU-bound.
+    num_elevation_rays: 41
+    num_azimuth_rays: 3           # across each beam's width (h_fov / (num_beams - 1))
+    range_min: 0.1                # [m]
+    range_max: 10.0               # [m]
+    range_stddev: 0.02            # [m] Gaussian range noise
+    exclude_models: [rov]         # never ray cast against these models
+    # sonar_link pose in base_link. MUST match urdf/rov.urdf (sonar_joint);
+    # checked by test/test_sonar_config.py.
+    mount_xyz: [0.21, 0.0, -0.06]
+    mount_rpy: [0.0, 0.0, 0.0]

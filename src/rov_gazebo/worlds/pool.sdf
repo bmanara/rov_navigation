@@ -1,0 +1,241 @@
+<?xml version="1.0"?>
+<!--
+  Pool world for the WATonomous ROV.
+
+  World frame: ENU, z up. Water surface at z = 0, floor at z = -4.
+  Pool interior: x in [-10, 10], y in [-6, 6].
+
+  Obstacles at different depths (for 3D navigation work later):
+    pillar          floor-to-surface column            (5, 3)
+    reef_block      2 x 2 x 1.5 m block on the floor   (-4, -3)
+    gate            posts + crossbar at z = -1.0       (8, -2)   pass UNDER the bar
+    shelf           2 x 2 m plate at z = -2.0          (-6, 4)   pass over or under
+    buoy            r = 0.4 m sphere centred z = -1.5   (2, -5)
+-->
+<sdf version="1.10">
+  <world name="pool">
+    <physics name="2ms" type="ignored">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <!-- Render engine is chosen on the gz command line (launch arg
+         `render_engine`), not here; see rov_gazebo/launch/sim.launch.py. -->
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors"/>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <!--
+      Buoyancy. Water (1000 kg/m^3) everywhere below z = 0, air above.
+      Graded rather than uniform_fluid_density: with a uniform fluid the
+      slightly-positive vehicle would keep rising out of the pool forever;
+      with the density change it surfaces and floats.
+    -->
+    <plugin filename="gz-sim-buoyancy-system" name="gz::sim::systems::Buoyancy">
+      <graded_buoyancy>
+        <default_density>1000</default_density>
+        <density_change>
+          <above_depth>0</above_depth>
+          <density>1</density>
+        </density_change>
+      </graded_buoyancy>
+      <enable>rov</enable>
+    </plugin>
+
+    <scene>
+      <ambient>0.4 0.6 0.7 1</ambient>
+      <background>0.1 0.4 0.55 1</background>
+      <grid>false</grid>
+    </scene>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <direction>-0.3 0.2 -0.9</direction>
+    </light>
+
+    <!-- ===================== Pool structure ===================== -->
+    <model name="pool">
+      <static>true</static>
+      <link name="link">
+        <!-- floor -->
+        <collision name="floor_collision">
+          <pose>0 0 -4.1 0 0 0</pose>
+          <geometry><box><size>21 13 0.2</size></box></geometry>
+        </collision>
+        <visual name="floor_visual">
+          <pose>0 0 -4.1 0 0 0</pose>
+          <geometry><box><size>21 13 0.2</size></box></geometry>
+          <material><ambient>0.6 0.7 0.75 1</ambient><diffuse>0.7 0.8 0.85 1</diffuse></material>
+        </visual>
+        <!-- lane line on the floor along x, handy for visual reference -->
+        <visual name="lane_line">
+          <pose>0 0 -3.995 0 0 0</pose>
+          <geometry><box><size>18 0.25 0.01</size></box></geometry>
+          <material><ambient>0.05 0.05 0.2 1</ambient><diffuse>0.05 0.05 0.3 1</diffuse></material>
+        </visual>
+        <!-- walls: x = +/-10.25, y = +/-6.25, height from -4.2 to +0.5 -->
+        <collision name="wall_px_collision">
+          <pose>10.25 0 -1.85 0 0 0</pose>
+          <geometry><box><size>0.5 13 4.7</size></box></geometry>
+        </collision>
+        <visual name="wall_px_visual">
+          <pose>10.25 0 -1.85 0 0 0</pose>
+          <geometry><box><size>0.5 13 4.7</size></box></geometry>
+          <material><ambient>0.75 0.8 0.85 1</ambient><diffuse>0.8 0.85 0.9 1</diffuse></material>
+        </visual>
+        <collision name="wall_nx_collision">
+          <pose>-10.25 0 -1.85 0 0 0</pose>
+          <geometry><box><size>0.5 13 4.7</size></box></geometry>
+        </collision>
+        <visual name="wall_nx_visual">
+          <pose>-10.25 0 -1.85 0 0 0</pose>
+          <geometry><box><size>0.5 13 4.7</size></box></geometry>
+          <material><ambient>0.75 0.8 0.85 1</ambient><diffuse>0.8 0.85 0.9 1</diffuse></material>
+        </visual>
+        <collision name="wall_py_collision">
+          <pose>0 6.25 -1.85 0 0 0</pose>
+          <geometry><box><size>21 0.5 4.7</size></box></geometry>
+        </collision>
+        <visual name="wall_py_visual">
+          <pose>0 6.25 -1.85 0 0 0</pose>
+          <geometry><box><size>21 0.5 4.7</size></box></geometry>
+          <material><ambient>0.75 0.8 0.85 1</ambient><diffuse>0.8 0.85 0.9 1</diffuse></material>
+        </visual>
+        <collision name="wall_ny_collision">
+          <pose>0 -6.25 -1.85 0 0 0</pose>
+          <geometry><box><size>21 0.5 4.7</size></box></geometry>
+        </collision>
+        <visual name="wall_ny_visual">
+          <pose>0 -6.25 -1.85 0 0 0</pose>
+          <geometry><box><size>21 0.5 4.7</size></box></geometry>
+          <material><ambient>0.75 0.8 0.85 1</ambient><diffuse>0.8 0.85 0.9 1</diffuse></material>
+        </visual>
+        <!-- water surface: visual only, no collision -->
+        <visual name="water_surface">
+          <pose>0 0 0 0 0 0</pose>
+          <geometry><box><size>20 12 0.001</size></box></geometry>
+          <transparency>0.7</transparency>
+          <cast_shadows>false</cast_shadows>
+          <material><ambient>0.0 0.4 0.6 0.3</ambient><diffuse>0.0 0.5 0.7 0.3</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===================== Obstacles ===================== -->
+    <model name="pillar">
+      <static>true</static>
+      <pose>5 3 -2 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><cylinder><radius>0.3</radius><length>4</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.3</radius><length>4</length></cylinder></geometry>
+          <material><ambient>0.6 0.3 0.1 1</ambient><diffuse>0.8 0.4 0.1 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="reef_block">
+      <static>true</static>
+      <pose>-4 -3 -3.25 0 0 0.4</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>2 2 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2 2 1.5</size></box></geometry>
+          <material><ambient>0.3 0.5 0.3 1</ambient><diffuse>0.3 0.6 0.3 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Gate: 2 m wide opening between the posts, crossbar at z = -1.0 -->
+    <model name="gate">
+      <static>true</static>
+      <pose>8 -2 0 0 0 0</pose>
+      <link name="link">
+        <collision name="post_left_collision">
+          <pose>0 1.0 -2.5 0 0 0</pose>
+          <geometry><cylinder><radius>0.05</radius><length>3.0</length></cylinder></geometry>
+        </collision>
+        <visual name="post_left_visual">
+          <pose>0 1.0 -2.5 0 0 0</pose>
+          <geometry><cylinder><radius>0.05</radius><length>3.0</length></cylinder></geometry>
+          <material><ambient>0.8 0.1 0.1 1</ambient><diffuse>0.9 0.1 0.1 1</diffuse></material>
+        </visual>
+        <collision name="post_right_collision">
+          <pose>0 -1.0 -2.5 0 0 0</pose>
+          <geometry><cylinder><radius>0.05</radius><length>3.0</length></cylinder></geometry>
+        </collision>
+        <visual name="post_right_visual">
+          <pose>0 -1.0 -2.5 0 0 0</pose>
+          <geometry><cylinder><radius>0.05</radius><length>3.0</length></cylinder></geometry>
+          <material><ambient>0.8 0.1 0.1 1</ambient><diffuse>0.9 0.1 0.1 1</diffuse></material>
+        </visual>
+        <collision name="crossbar_collision">
+          <pose>0 0 -1.0 1.5708 0 0</pose>
+          <geometry><cylinder><radius>0.05</radius><length>2.1</length></cylinder></geometry>
+        </collision>
+        <visual name="crossbar_visual">
+          <pose>0 0 -1.0 1.5708 0 0</pose>
+          <geometry><cylinder><radius>0.05</radius><length>2.1</length></cylinder></geometry>
+          <material><ambient>0.8 0.1 0.1 1</ambient><diffuse>0.9 0.1 0.1 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Shelf: a suspended plate at mid depth (held by a thin rod to the floor) -->
+    <model name="shelf">
+      <static>true</static>
+      <pose>-6 4 0 0 0 0</pose>
+      <link name="link">
+        <collision name="plate_collision">
+          <pose>0 0 -2.0 0 0 0</pose>
+          <geometry><box><size>2 2 0.1</size></box></geometry>
+        </collision>
+        <visual name="plate_visual">
+          <pose>0 0 -2.0 0 0 0</pose>
+          <geometry><box><size>2 2 0.1</size></box></geometry>
+          <material><ambient>0.8 0.7 0.1 1</ambient><diffuse>0.9 0.8 0.1 1</diffuse></material>
+        </visual>
+        <collision name="rod_collision">
+          <pose>0.9 0.9 -3.0 0 0 0</pose>
+          <geometry><cylinder><radius>0.04</radius><length>2.0</length></cylinder></geometry>
+        </collision>
+        <visual name="rod_visual">
+          <pose>0.9 0.9 -3.0 0 0 0</pose>
+          <geometry><cylinder><radius>0.04</radius><length>2.0</length></cylinder></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.4 0.4 0.4 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Buoy: tethered sphere -->
+    <model name="buoy">
+      <static>true</static>
+      <pose>2 -5 0 0 0 0</pose>
+      <link name="link">
+        <collision name="sphere_collision">
+          <pose>0 0 -1.5 0 0 0</pose>
+          <geometry><sphere><radius>0.4</radius></sphere></geometry>
+        </collision>
+        <visual name="sphere_visual">
+          <pose>0 0 -1.5 0 0 0</pose>
+          <geometry><sphere><radius>0.4</radius></sphere></geometry>
+          <material><ambient>0.9 0.5 0.0 1</ambient><diffuse>1.0 0.6 0.0 1</diffuse></material>
+        </visual>
+        <visual name="tether_visual">
+          <pose>0 0 -2.95 0 0 0</pose>
+          <geometry><cylinder><radius>0.01</radius><length>2.1</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

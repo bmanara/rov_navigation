@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<!--
+  URDF for robot_state_publisher / RViz: frames only (+ simple visuals).
+  Physics, sensors and plugins live in models/rov/model.sdf; sensor and
+  thruster frames here must match that file and config/thrusters.yaml.
+
+  Frames (all fixed to base_link):
+    imu_link              IMU (co-located with base_link)
+    dvl_link              DVL, bottom-facing, 8 cm below base_link
+    depth_link            pressure sensor
+    camera_link           forward camera (x forward, REP-103)
+    camera_optical_frame  same origin, REP-103 optical (z forward, x right, y down)
+    sonar_link            forward-looking sonar (x forward), see rov_gazebo/config/sonar.yaml
+    thrusterN             thruster mount points (spin is not modelled in TF)
+-->
+<robot name="rov">
+  <material name="blue"><color rgba="0.0 0.3 0.9 1.0"/></material>
+  <material name="dark"><color rgba="0.15 0.15 0.15 1.0"/></material>
+  <material name="grey"><color rgba="0.7 0.7 0.7 0.6"/></material>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.44 0.30 0.02"/></geometry>
+      <material name="dark"/>
+    </visual>
+    <visual>
+      <origin xyz="0 0 0.07" rpy="0 0 0"/>
+      <geometry><box size="0.40 0.29 0.06"/></geometry>
+      <material name="blue"/>
+    </visual>
+    <visual>
+      <origin xyz="0 0 -0.05" rpy="0 1.5708 0"/>
+      <geometry><cylinder radius="0.05" length="0.40"/></geometry>
+      <material name="grey"/>
+    </visual>
+  </link>
+
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/><child link="imu_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="dvl_link"/>
+  <joint name="dvl_joint" type="fixed">
+    <parent link="base_link"/><child link="dvl_link"/>
+    <origin xyz="0 0 -0.08" rpy="0 0 0"/>
+  </joint>
+
+  <link name="depth_link"/>
+  <joint name="depth_joint" type="fixed">
+    <parent link="base_link"/><child link="depth_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="camera_link"/>
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/><child link="camera_link"/>
+    <origin xyz="0.22 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Forward-looking sonar. Pose must match rov_gazebo/config/sonar.yaml -->
+  <link name="sonar_link">
+    <visual><geometry><box size="0.04 0.08 0.06"/></geometry><material name="dark"/></visual>
+  </link>
+  <joint name="sonar_joint" type="fixed">
+    <parent link="base_link"/><child link="sonar_link"/>
+    <origin xyz="0.21 0.0 -0.06" rpy="0 0 0"/>
+  </joint>
+
+  <link name="camera_optical_frame"/>
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/><child link="camera_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-1.5707963 0 -1.5707963"/>
+  </joint>
+
+  <!-- Thruster mounts: positions from config/thrusters.yaml -->
+  <link name="thruster1"><visual><origin xyz="0 0 0" rpy="0 1.5708 0.7854"/><geometry><cylinder radius="0.045" length="0.10"/></geometry><material name="dark"/></visual></link>
+  <joint name="thruster1_mount" type="fixed"><parent link="base_link"/><child link="thruster1"/><origin xyz="0.15 -0.11 0.0" rpy="0 0 0"/></joint>
+  <link name="thruster2"><visual><origin xyz="0 0 0" rpy="0 1.5708 -0.7854"/><geometry><cylinder radius="0.045" length="0.10"/></geometry><material name="dark"/></visual></link>
+  <joint name="thruster2_mount" type="fixed"><parent link="base_link"/><child link="thruster2"/><origin xyz="0.15 0.11 0.0" rpy="0 0 0"/></joint>
+  <link name="thruster3"><visual><origin xyz="0 0 0" rpy="0 1.5708 -0.7854"/><geometry><cylinder radius="0.045" length="0.10"/></geometry><material name="dark"/></visual></link>
+  <joint name="thruster3_mount" type="fixed"><parent link="base_link"/><child link="thruster3"/><origin xyz="-0.15 -0.11 0.0" rpy="0 0 0"/></joint>
+  <link name="thruster4"><visual><origin xyz="0 0 0" rpy="0 1.5708 0.7854"/><geometry><cylinder radius="0.045" length="0.10"/></geometry><material name="dark"/></visual></link>
+  <joint name="thruster4_mount" type="fixed"><parent link="base_link"/><child link="thruster4"/><origin xyz="-0.15 0.11 0.0" rpy="0 0 0"/></joint>
+  <link name="thruster5"><visual><geometry><cylinder radius="0.045" length="0.10"/></geometry><material name="dark"/></visual></link>
+  <joint name="thruster5_mount" type="fixed"><parent link="base_link"/><child link="thruster5"/><origin xyz="0.12 -0.22 0.0" rpy="0 0 0"/></joint>
+  <link name="thruster6"><visual><geometry><cylinder radius="0.045" length="0.10"/></geometry><material name="dark"/></visual></link>
+  <joint name="thruster6_mount" type="fixed"><parent link="base_link"/><child link="thruster6"/><origin xyz="0.12 0.22 0.0" rpy="0 0 0"/></joint>
+  <link name="thruster7"><visual><geometry><cylinder radius="0.045" length="0.10"/></geometry><material name="dark"/></visual></link>
+  <joint name="thruster7_mount" type="fixed"><parent link="base_link"/><child link="thruster7"/><origin xyz="-0.12 -0.22 0.0" rpy="0 0 0"/></joint>
+  <link name="thruster8"><visual><geometry><cylinder radius="0.045" length="0.10"/></geometry><material name="dark"/></visual></link>
+  <joint name="thruster8_mount" type="fixed"><parent link="base_link"/><child link="thruster8"/><origin xyz="-0.12 0.22 0.0" rpy="0 0 0"/></joint>
+</robot>

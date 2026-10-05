@@ -1,0 +1,34 @@
+# Velocity controller gains. SI units. All gains can be changed live:
+#   ros2 param set /velocity_controller vx.kp 50.0
+#
+# PID outputs: vx/vy/vz -> force [N]; yaw_rate/roll/pitch/*_rate -> torque [Nm];
+# depth -> vertical speed reference [m/s] (out_limit = max ascent/descent rate).
+#
+# Initial values sized from the model: m ~11.4 kg (+5.5 / 12.7 / 14.6 kg added
+# mass in x/y/z), Izz ~0.42 kg m^2 incl. added inertia, thrust capacity
+# ~113 N horizontal, ~160 N up / 120 N down. vx/vy/vz gains then raised after
+# step tests (2026-10-04, ground truth): kp 40/ki 10 gave ~2.3 s rise because
+# the integrator was slow to pick up drag; kp 80/ki 60 gives <1 s settling,
+# <3 % overshoot. See README "Tuning" before changing.
+velocity_controller:
+  ros__parameters:
+    odom_topic: /odometry/filtered
+    control_rate: 50.0
+    cmd_vel_timeout: 0.5     # [s] stale /cmd_vel => zero velocity command
+    odom_timeout: 0.5        # [s] stale odometry => zero wrench
+
+    vz_deadband: 0.001       # [m/s] |cmd.linear.z| above this => vz velocity mode
+    angular_deadband: 0.001  # [rad/s] |cmd.angular.x/y| above this => rate mode
+    net_buoyancy: 1.96       # [N] model's net positive buoyancy, feed-forward
+
+    vx:       {kp: 80.0, ki: 60.0, kd: 0.0, i_limit: 30.0, out_limit: 80.0}
+    vy:       {kp: 80.0, ki: 60.0, kd: 0.0, i_limit: 30.0, out_limit: 80.0}
+    vz:       {kp: 80.0, ki: 50.0, kd: 0.0, i_limit: 30.0, out_limit: 100.0}
+    yaw_rate: {kp: 6.0,  ki: 2.0,  kd: 0.0, i_limit: 5.0,  out_limit: 15.0}
+
+    roll:     {kp: 20.0, ki: 2.0,  kd: 4.0, i_limit: 3.0,  out_limit: 15.0}
+    pitch:    {kp: 20.0, ki: 2.0,  kd: 4.0, i_limit: 3.0,  out_limit: 15.0}
+    roll_rate:  {kp: 4.0, ki: 0.0, kd: 0.0, i_limit: 3.0, out_limit: 15.0}
+    pitch_rate: {kp: 4.0, ki: 0.0, kd: 0.0, i_limit: 3.0, out_limit: 15.0}
+
+    depth:    {kp: 0.8,  ki: 0.05, kd: 0.0, i_limit: 0.1,  out_limit: 0.4}
