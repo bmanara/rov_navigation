@@ -1,5 +1,8 @@
 <library path="rov_navigation_plugin">
-	<class name="rov_navigation::StraightLine" type="rov_navigation::StraightLine" base_class_type="nav2_core::GlobalPlanner">
-	  <description>This is an example plugin which produces straight path.</description>
+	<class name="rov_navigation::StraightLine3D" type="rov_navigation::StraightLine3D" base_class_type="nav2_core::GlobalPlanner">
+	  <description>This is a straight line global planner for 3D.</description>
 	</class>
+    <class name="rov_navigation::GoalChecker3D" type="rov_navigation::GoalChecker3D" base_class_type="nav2_core::GoalChecker">
+      <description>This is a 3D goal checker plugin for ROV navigation.</description>
+    </class>
 </library>

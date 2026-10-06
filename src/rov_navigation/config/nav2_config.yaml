@@ -51,7 +51,7 @@ controller_server:
     #  stateful: True
     general_goal_checker:
       stateful: True
-      plugin: "nav2_controller::SimpleGoalChecker"
+      plugin: "rov_navigation::GoalChecker3D"
       xy_goal_tolerance: 0.25
       yaw_goal_tolerance: 0.25
     FollowPath:
@@ -201,7 +201,7 @@ planner_server:
     planner_plugins: ["GridBased"]
     costmap_update_timeout: 1.0
     GridBased:
-      plugin: "rov_navigation::StraightLine"
+      plugin: "rov_navigation::StraightLine3D"
       interpolation_resolution: 0.1
 
 smoother_server:

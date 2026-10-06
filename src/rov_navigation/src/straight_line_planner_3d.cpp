@@ -9,7 +9,7 @@
 namespace rov_navigation
 {
 
-void StraightLine::configure(
+void StraightLine3D::configure(
   const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
   std::string name, std::shared_ptr<tf2_ros::Buffer> tf,
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros)
@@ -27,28 +27,28 @@ void StraightLine::configure(
   node_->get_parameter(name_ + ".interpolation_resolution", interpolation_resolution_);
 }
 
-void StraightLine::cleanup()
+void StraightLine3D::cleanup()
 {
   RCLCPP_INFO(
     node_->get_logger(), "CleaningUp plugin %s of type NavfnPlanner",
     name_.c_str());
 }
 
-void StraightLine::activate()
+void StraightLine3D::activate()
 {
   RCLCPP_INFO(
     node_->get_logger(), "Activating plugin %s of type NavfnPlanner",
     name_.c_str());
 }
 
-void StraightLine::deactivate()
+void StraightLine3D::deactivate()
 {
   RCLCPP_INFO(
     node_->get_logger(), "Deactivating plugin %s of type NavfnPlanner",
     name_.c_str());
 }
 
-nav_msgs::msg::Path StraightLine::createPlan(
+nav_msgs::msg::Path StraightLine3D::createPlan(
   const geometry_msgs::msg::PoseStamped & start,
   const geometry_msgs::msg::PoseStamped & goal,
   std::function<bool()> /*cancel_checker*/)
@@ -104,4 +104,4 @@ nav_msgs::msg::Path StraightLine::createPlan(
 }  // namespace rov_navigation
 
 #include "pluginlib/class_list_macros.hpp"
-PLUGINLIB_EXPORT_CLASS(rov_navigation::StraightLine, nav2_core::GlobalPlanner)
+PLUGINLIB_EXPORT_CLASS(rov_navigation::StraightLine3D, nav2_core::GlobalPlanner)

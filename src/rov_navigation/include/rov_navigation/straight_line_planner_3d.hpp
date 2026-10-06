@@ -17,11 +17,11 @@
 namespace rov_navigation
 {
 
-class StraightLine : public nav2_core::GlobalPlanner
+class StraightLine3D : public nav2_core::GlobalPlanner
 {
 public:
-  StraightLine() = default;
-  ~StraightLine() = default;
+  StraightLine3D() = default;
+  ~StraightLine3D() = default;
 
   // plugin configure
   void configure(
