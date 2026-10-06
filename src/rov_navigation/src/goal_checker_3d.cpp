@@ -33,11 +33,14 @@ void GoalChecker3D::initialize(
     nav2_util::declare_parameter_if_not_declared(
         node, p("z_goal_tolerance"), rclcpp::ParameterValue(0.25));
     nav2_util::declare_parameter_if_not_declared(
-        node, p("check_yaw"), rclcpp::ParameterValue(false));
-    nav2_util::declare_parameter_if_not_declared(
         node, p("yaw_goal_tolerance"), rclcpp::ParameterValue(0.25));
     nav2_util::declare_parameter_if_not_declared(
         node, p("stateful"), rclcpp::ParameterValue(true));
+
+    xy_goal_tolerance_ = node->get_parameter(p("xy_goal_tolerance")).as_double();
+    z_goal_tolerance_ = node->get_parameter(p("z_goal_tolerance")).as_double();
+    yaw_goal_tolerance_ = node->get_parameter(p("yaw_goal_tolerance")).as_double();
+    stateful_ = node->get_parameter(p("stateful")).as_bool();
 
     if (xy_goal_tolerance_ < 0.0 || z_goal_tolerance_ < 0.0 || yaw_goal_tolerance_ < 0.0) {
         throw std::runtime_error("Goal Checker 3D: Tolerances must be non-negative");
