@@ -3,6 +3,7 @@
 #include <memory>
 #include "nav2_util/node_utils.hpp"
 
+#include "rov_navigation/straight_line_3d.hpp"
 #include "rov_navigation/straight_line_planner_3d.hpp"
 
 namespace rov_navigation
@@ -72,19 +73,17 @@ nav_msgs::msg::Path StraightLine::createPlan(
   global_path.poses.clear();
   global_path.header.stamp = node_->now();
   global_path.header.frame_id = global_frame_;
-  // calculating the number of loops for current value of interpolation_resolution_
-  int total_number_of_loop = std::hypot(
-    goal.pose.position.x - start.pose.position.x,
-    goal.pose.position.y - start.pose.position.y) /
-    interpolation_resolution_;
-  double x_increment = (goal.pose.position.x - start.pose.position.x) / total_number_of_loop;
-  double y_increment = (goal.pose.position.y - start.pose.position.y) / total_number_of_loop;
 
-  for (int i = 0; i < total_number_of_loop; ++i) {
+  std::vector<rov_navigation::Vec3D> path_vec = rov_navigation::generateStraightLinePath3D(
+    {start.pose.position.x, start.pose.position.y, start.pose.position.z},
+    {goal.pose.position.x, goal.pose.position.y, goal.pose.position.z},
+    interpolation_resolution_);
+
+  for (const auto& point : path_vec) {
     geometry_msgs::msg::PoseStamped pose;
-    pose.pose.position.x = start.pose.position.x + x_increment * i;
-    pose.pose.position.y = start.pose.position.y + y_increment * i;
-    pose.pose.position.z = 0.0;
+    pose.pose.position.x = point.x;
+    pose.pose.position.y = point.y;
+    pose.pose.position.z = point.z;
     pose.pose.orientation.x = 0.0;
     pose.pose.orientation.y = 0.0;
     pose.pose.orientation.z = 0.0;
