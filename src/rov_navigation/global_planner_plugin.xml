@@ -1,0 +1,5 @@
+<library path="rov_navigation_plugin">
+	<class name="rov_navigation::StraightLine" type="rov_navigation::StraightLine" base_class_type="nav2_core::GlobalPlanner">
+	  <description>This is an example plugin which produces straight path.</description>
+	</class>
+</library>
