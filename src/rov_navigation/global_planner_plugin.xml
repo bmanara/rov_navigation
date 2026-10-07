@@ -8,4 +8,7 @@
   <class name="rov_navigation::ProgressChecker3D" type="rov_navigation::ProgressChecker3D" base_class_type="nav2_core::ProgressChecker">
     <description>This is a 3D progress checker plugin for ROV navigation.</description>
   </class>
+  <class name="rov_navigation::PurePursuitController3D" type="rov_navigation::PurePursuitController3D" base_class_type="nav2_core::Controller">
+    <description>This is a 3D pure pursuit controller plugin for ROV navigation.</description>
+  </class>
 </library>

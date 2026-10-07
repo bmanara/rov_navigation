@@ -53,6 +53,7 @@ add_library(${library_name} SHARED
   src/straight_line_planner_3d.cpp
   src/goal_checker_3d.cpp
   src/progress_checker_3d.cpp
+  src/pure_pursuit_controller_3d.cpp
 )
 
 ament_target_dependencies(${library_name}
