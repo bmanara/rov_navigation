@@ -6,7 +6,7 @@ import textwrap
 import numpy as np
 import pytest
 
-from rov_gazebo.raycast import (Pose, Primitive, cast, fan_directions,
+from rov_gazebo.raycast import (Pose, Primitive, beam_grid, cast,
                                 load_world_primitives, quaternion_to_matrix,
                                 rpy_to_matrix)
 
@@ -93,38 +93,28 @@ def test_nearest_of_several():
     assert cast(prims, *ray([0, 0, 0], [1, 0, 0]))[0] == pytest.approx(2.5)
 
 
-# ---- fan ----
+# ---- beam grid ----
 
-def test_fan_geometry():
-    d = fan_directions(math.radians(90), 3, math.radians(20), 5)
-    assert d.shape == (15, 3)
-    assert np.allclose(np.linalg.norm(d, axis=1), 1.0)
-    beam0 = d[:5]  # first beam = rightmost (-45 deg azimuth)
-    assert np.allclose(np.arctan2(beam0[:, 1], beam0[:, 0]), math.radians(-45))
-    assert np.max(beam0[:, 2]) == pytest.approx(math.sin(math.radians(10)))
-
-
-def test_fan_azimuth_subrays_stay_within_beam():
-    fov, n = math.radians(90), 3          # beam centres -45, 0, 45 deg; width 45 deg
-    d = fan_directions(fov, n, math.radians(20), 5, n_azimuth=3)
-    assert d.shape == (3 * 3 * 5, 3)
-    az = np.degrees(np.arctan2(d[:, 1], d[:, 0])).reshape(3, 15)
-    for centre, beam in zip((-45, 0, 45), az):
-        assert np.all(np.abs(beam - centre) < 22.5)       # inside the beam width
-        assert sorted(set(np.round(beam - centre, 6))) == pytest.approx([-11.25, 0, 11.25])
+def test_beam_grid_layout():
+    rays, centres = beam_grid(math.radians(90), 3, math.radians(20), 2, sub_az=3, sub_el=2)
+    assert rays.shape == (2 * 3 * 3 * 2, 3)
+    assert centres.shape == (2, 3, 3)
+    assert np.allclose(np.linalg.norm(rays, axis=1), 1.0)
+    az = np.degrees(np.arctan2(centres[..., 1], centres[..., 0]))
+    el = np.degrees(np.arcsin(centres[..., 2]))
+    assert np.allclose(az[0], [-45, 0, 45])          # columns right -> left
+    assert np.allclose(el[:, 0], [10, -10])          # rows top -> bottom
 
 
-def test_dense_fan_sees_gate_but_sparse_misses_crossbar():
-    prims = load_world_primitives(POOL, exclude_models=['rov'])
-    o = np.array([0.21, 0.0, -0.56])  # sonar on a ROV at the spawn pose
-    beam = math.radians(-15.5)        # through the gate opening, below the crossbar
-    def beam_range(n_el):
-        d = fan_directions(math.radians(1e-6), 1, math.radians(20), n_el)
-        c, s = math.cos(beam), math.sin(beam)
-        d = d @ np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]]).T
-        return cast(prims, np.broadcast_to(o, d.shape), d).min()
-    assert beam_range(5) > 10.0                    # rays straddle the 10 cm bar
-    assert beam_range(41) == pytest.approx(8.05, abs=0.05)
+def test_beam_grid_subrays_stay_in_their_cell():
+    rays, centres = beam_grid(math.radians(90), 3, math.radians(20), 2, sub_az=3, sub_el=3)
+    per_beam = rays.reshape(2 * 3, 9, 3)
+    c = centres.reshape(-1, 3)
+    for beam, centre in zip(per_beam, c):
+        az = np.degrees(np.arctan2(beam[:, 1], beam[:, 0]) - math.atan2(centre[1], centre[0]))
+        el = np.degrees(np.arcsin(beam[:, 2]) - math.asin(centre[2]))
+        assert np.all(np.abs(az) < 45 / 2) and np.all(np.abs(el) < 20 / 2)
+        assert len(set(np.round(az, 6))) == 3 and len(set(np.round(el, 6))) == 3
 
 
 # ---- SDF parsing ----

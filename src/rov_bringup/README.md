@@ -50,7 +50,8 @@ Launch args (all launch files): `gui`, `rviz`, `use_ground_truth`, `use_sim_time
 | `/sensors/dvl` | `geometry_msgs/TwistWithCovarianceStamped` | `dvl_link`, 10 Hz, emulated |
 | `/sensors/depth` | `std_msgs/Float64` | meters, positive down, 20 Hz, emulated |
 | `/sensors/depth/pose` | `geometry_msgs/PoseWithCovarianceStamped` | same measurement as z-up pose in `odom`, for the EKF |
-| `/sensors/sonar` | `sensor_msgs/LaserScan` | `sonar_link`, 10 Hz, forward-looking multibeam (130°, 64 beams, 0.1–10 m), emulated |
+| `/sensors/sonar/points` | `sensor_msgs/PointCloud2` | `sonar_link`, 10 Hz, 3D multibeam: 64 × 24 beams over 130° × 40°, 0.1–10 m; x/y/z of hits (organized + NaN optional), emulated |
+| `/sensors/sonar` | `sensor_msgs/LaserScan` | `sonar_link`, same sonar collapsed to 2D: nearest return per azimuth column |
 | `/sensors/camera/image_raw`, `/camera_info` | `sensor_msgs/Image`, `CameraInfo` | `camera_optical_frame`, 15 Hz |
 
 Internal (control):
@@ -82,7 +83,7 @@ z = -4. The ROV spawns at (0, 0, -0.5) and floats up if left alone.
 | Package | Contents |
 |---|---|
 | `rov_description` | `models/rov/model.sdf` (Gazebo model + plugins), `urdf/rov.urdf` (TF frames), `config/thrusters.yaml` (geometry, single source of truth); consistency test |
-| `rov_gazebo` | `worlds/pool.sdf`, `config/bridge.yaml`, `sensor_emulator.py` (depth, DVL, IMU covariance), `sonar_emulator.py` + `rov_gazebo/raycast.py` (sonar), `launch/sim.launch.py` |
+| `rov_gazebo` | `worlds/pool.sdf`, `config/bridge.yaml`, `sensor_emulator.py` (depth, DVL, IMU covariance), `sonar_emulator.py` + `rov_gazebo/{raycast,sonar_model}.py` (3D sonar), `launch/sim.launch.py` |
 | `rov_control` | `velocity_controller`, `thruster_allocator`, ROS-free `rov_control_core` lib + gtests, `step_response.py` |
 | `rov_localization` | `config/ekf.yaml`, `ground_truth_tf.py`, `launch/localization.launch.py` |
 | `rov_bringup` | top-level launches, RViz config, `goto_pose_check.py` (milestone 7 interface check) |
@@ -100,14 +101,17 @@ z = -4. The ROV spawns at (0, 0, -0.5) and floats up if left alone.
   values. Tune them against the real vehicle (milestone 6).
 - **Depth and DVL are emulated** from ground truth plus Gaussian noise. See
   `sensor_emulator.py` for the reasoning and how to swap in Gazebo's DVL sensor.
-- **Sonar is a CPU ray cast**, not a Gazebo sensor. `sonar_emulator.py` loads
-  the world SDF's collision primitives and casts the beam fan from the
-  ground-truth pose, so it needs no GPU. Each of the 64 beams has a 20° vertical
-  aperture sampled by 5 rays; the beam reports the nearest hit. It only sees
-  **box / cylinder / sphere collisions in the world file**: meshes, spawned or
-  moving models are invisible to it (a warning is logged for unsupported shapes).
-  No acoustics (multipath, surface returns, intensity). Parameters:
-  `rov_gazebo/config/sonar.yaml`.
+- **Sonar is a CPU ray cast**, not a Gazebo sensor, so it needs no GPU.
+  `sonar_emulator.py` loads the world SDF's collision primitives and casts a
+  64 × 24 grid of beams (130° × 40°, each sampled by 3 × 3 rays) from the
+  ground-truth pose. Each beam reports its nearest echo, placed along the
+  beam centre, so lateral error grows with range like a real sonar.
+  Limits: it only sees **box / cylinder / sphere collisions in the world
+  file** (meshes, spawned or moving models are invisible; unsupported shapes
+  log a warning), and it has no acoustics (multipath, surface returns,
+  intensity). Parameters: `rov_gazebo/config/sonar.yaml`.
+  For a frustum-clearing costmap layer (e.g. STVL), the sensor frustum is
+  130° (h) × 40° (v), 0.1–10 m, from `sonar_link`.
 - **Multiple Gazebo versions installed** (e.g. Harmonic + Jetty): launch files
   run `gz sim --force-version 8` and default `render_engine:=gz-rendering8-ogre2`.
   Jetty installs an unversioned `libgz-rendering-ogre2.so` in the system lib

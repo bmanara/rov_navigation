@@ -193,25 +193,41 @@ def cast(primitives, origins, directions):
     return best
 
 
-def fan_directions(h_fov, n_beams, v_aperture, n_elevations, n_azimuth=1):
-    """Unit ray directions (sensor frame, x forward, z up) for a sonar fan.
+def _subdivide(centres, n_sub):
+    """n_sub sample offsets inside each cell around `centres` (cell = centre spacing)."""
+    width = (centres[1] - centres[0]) if len(centres) > 1 else 0.0
+    if n_sub <= 1 or width == 0.0:
+        return np.zeros(1)
+    return np.linspace(-width / 2.0, width / 2.0, n_sub + 2)[1:-1]
 
-    Beam centres run from -h_fov/2 (right) to +h_fov/2 (left), matching
-    LaserScan's counter-clockwise angle convention. Each beam is sampled by
-    n_azimuth x n_elevations rays: n_elevations across the vertical aperture,
-    n_azimuth across the beam's horizontal width (the beam spacing
-    h_fov / (n_beams - 1)). Dense sampling matters: thin structures (10 cm
-    gate posts / crossbar) fall between sparse rays.
 
-    Returns (n_beams * n_azimuth * n_elevations, 3), beam-major: each
-    consecutive block of n_azimuth * n_elevations rows is one beam.
+def beam_grid(h_fov, n_az, v_fov, n_el, sub_az=1, sub_el=1):
+    """Ray directions for a 2D grid of sonar beams (sensor frame: x fwd, y left, z up).
+
+    Beam centres: azimuth from -h_fov/2 (right) to +h_fov/2 (left), elevation
+    from +v_fov/2 (top row) to -v_fov/2 (bottom row), i.e. image-like rows.
+    Each beam is sampled by sub_az x sub_el rays spread inside its cell (the
+    spacing between beam centres); dense sampling keeps thin structures
+    (10 cm gate bars) from slipping between rays.
+
+    Returns:
+      rays    (n_el * n_az * sub_az * sub_el, 3), beam-major: each consecutive
+              block of sub_az * sub_el rows is one beam, beams in row-major
+              (elevation row, then azimuth column) order.
+      centres (n_el, n_az, 3) unit beam-centre directions.
     """
-    centres = np.linspace(-h_fov / 2.0, h_fov / 2.0, n_beams)
-    width = h_fov / max(n_beams - 1, 1)
-    sub_az = (np.linspace(-width / 2.0, width / 2.0, n_azimuth + 2)[1:-1]
-              if n_azimuth > 1 else np.zeros(1))
-    el = (np.linspace(-v_aperture / 2.0, v_aperture / 2.0, n_elevations)
-          if n_elevations > 1 else np.zeros(1))
-    C, S, E = np.meshgrid(centres, sub_az, el, indexing='ij')
-    A, E = (C + S).ravel(), E.ravel()
-    return np.stack([np.cos(E) * np.cos(A), np.cos(E) * np.sin(A), np.sin(E)], axis=1)
+    az = np.linspace(-h_fov / 2.0, h_fov / 2.0, n_az)
+    el = np.linspace(v_fov / 2.0, -v_fov / 2.0, n_el) if n_el > 1 else np.zeros(1)
+    d_az = _subdivide(az, sub_az)
+    d_el = _subdivide(el[::-1], sub_el)
+
+    def unit(A, E):
+        return np.stack([np.cos(E) * np.cos(A), np.cos(E) * np.sin(A), np.sin(E)], axis=-1)
+
+    EL, AZ = np.meshgrid(el, az, indexing='ij')                     # (n_el, n_az)
+    centres = unit(AZ, EL)
+    A = AZ[:, :, None, None] + d_az[None, None, :, None]
+    E = EL[:, :, None, None] + d_el[None, None, None, :]
+    A, E = np.broadcast_arrays(A, E)
+    rays = unit(A, E).reshape(-1, 3)
+    return rays, centres

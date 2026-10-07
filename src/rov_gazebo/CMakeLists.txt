@@ -17,6 +17,7 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_raycast test/test_raycast.py)
   ament_add_pytest_test(test_sonar_config test/test_sonar_config.py)
+  ament_add_pytest_test(test_sonar_model test/test_sonar_model.py)
 endif()
 
 ament_package()

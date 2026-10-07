@@ -1,18 +1,23 @@
-# Emulated forward-looking multibeam sonar (scripts/sonar_emulator.py).
-# Roughly a small imaging FLS (e.g. Oculus M750d-class at low frequency),
-# simplified to a range-only LaserScan. world_file is set by the launch file.
+# Emulated forward-looking 3D multibeam sonar (scripts/sonar_emulator.py).
+# Roughly a 3D imaging sonar (Echoscope-class), range-only (no intensity).
+# Publishes /sensors/sonar/points (PointCloud2) and /sensors/sonar (LaserScan).
+# world_file is set by the launch file.
 sonar_emulator:
   ros__parameters:
     frame_id: sonar_link
     rate: 10.0                    # [Hz]
+    # Beam grid: num_elevation_beams rows x num_beams columns. Sub-rays sample
+    # each beam's cell; 3x3 keeps 10 cm gate bars from slipping between rays
+    # at ~8 m. 64 x 24 x 9 = 13824 rays/scan, ~15 ms in the pool world.
     horizontal_fov_deg: 130.0
     num_beams: 64
-    vertical_aperture_deg: 20.0   # beam height
-    # Rays per beam = num_azimuth_rays x num_elevation_rays. 41 elevation rays
-    # = ~9 cm spacing at 10 m, so the 10 cm gate crossbar/posts aren't missed.
-    # Cost ~10 ms/scan for the pool; lower these if CPU-bound.
-    num_elevation_rays: 41
-    num_azimuth_rays: 3           # across each beam's width (h_fov / (num_beams - 1))
+    vertical_fov_deg: 40.0
+    num_elevation_beams: 24
+    sub_rays_azimuth: 3
+    sub_rays_elevation: 3
+    # false: cloud of hits only (what STVL / most costmap layers expect)
+    # true:  organized 24 x 64 cloud, NaN for beams with no return
+    organized_cloud: false
     range_min: 0.1                # [m]
     range_max: 10.0               # [m]
     range_stddev: 0.02            # [m] Gaussian range noise

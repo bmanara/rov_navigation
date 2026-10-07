@@ -1,31 +1,49 @@
 #!/usr/bin/python3
-"""Emulated forward-looking multibeam sonar, CPU ray cast (no GPU / gpu_lidar).
+"""Emulated forward-looking 3D multibeam sonar, CPU ray cast (no GPU / gpu_lidar).
 
-The sonar is a horizontal fan of beams. Each beam is sampled by a grid of
-rays across its vertical aperture and horizontal beam width; the beam's range
-is the nearest hit among them (a sonar returns the first echo anywhere in its beam). Rays are cast
-against the static collision primitives of the world SDF (rov_gazebo.raycast),
-from the vehicle's ground-truth pose.
+A grid of beams (num_elevation_beams rows x num_beams columns) covering
+horizontal_fov_deg x vertical_fov_deg. Each beam returns its nearest echo,
+placed along the beam centre (rov_gazebo.sonar_model). Rays are cast against
+the static collision primitives of the world SDF (rov_gazebo.raycast), from the
+vehicle's ground-truth pose.
 
-Limitations (it's geometry, not acoustics): no multipath, no surface/floor
-reverberation unless the floor is inside the beam, no intensity model, and
-only box/cylinder/sphere collisions in the world file are visible. Moving
-models are not seen.
+Limitations (it's geometry, not acoustics): no multipath, no surface
+reverberation, no intensity, and only box/cylinder/sphere collisions in the
+world file are visible. Spawned or moving models are not seen.
 
-Input:   /odometry/ground_truth  nav_msgs/Odometry (odom == world)
-Output:  /sensors/sonar          sensor_msgs/LaserScan, frame sonar_link
-         REP-117: +inf = no return within range_max, -inf = closer than range_min.
+Input:   /odometry/ground_truth   nav_msgs/Odometry (odom == world)
+Output:  /sensors/sonar/points    sensor_msgs/PointCloud2 (x, y, z float32), frame sonar_link
+           organized_cloud=false: hits only, height 1, is_dense true
+           organized_cloud=true:  height = elevation rows (top first),
+                                  width = azimuth columns (right to left), NaN = no return
+         /sensors/sonar           sensor_msgs/LaserScan, frame sonar_link: nearest
+                                  return per azimuth column (the 3D grid collapsed).
+                                  REP-117: +inf = no return, -inf = closer than range_min.
 """
-import math
-
 import numpy as np
 import rclpy
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, PointCloud2, PointField
 
-from rov_gazebo.raycast import (cast, fan_directions, load_world_primitives,
-                                quaternion_to_matrix, rpy_to_matrix)
+from rov_gazebo.raycast import load_world_primitives, quaternion_to_matrix, rpy_to_matrix
+from rov_gazebo.sonar_model import SonarConfig, SonarModel
+
+XYZ_FIELDS = [PointField(name=n, offset=4 * i, datatype=PointField.FLOAT32, count=1)
+              for i, n in enumerate('xyz')]
+
+
+def make_cloud(header, xyz, height, width, dense):
+    msg = PointCloud2()
+    msg.header = header
+    msg.height, msg.width = height, width
+    msg.fields = XYZ_FIELDS
+    msg.is_bigendian = False
+    msg.point_step = 12
+    msg.row_step = 12 * width
+    msg.is_dense = dense
+    msg.data = np.ascontiguousarray(xyz, dtype='<f4').tobytes()
+    return msg
 
 
 class SonarEmulator(Node):
@@ -37,73 +55,72 @@ class SonarEmulator(Node):
         exclude = p('exclude_models', ['rov']).value
         self.frame = p('frame_id', 'sonar_link').value
         rate = p('rate', 10.0).value
-        self.h_fov = math.radians(p('horizontal_fov_deg', 130.0).value)
-        self.n_beams = p('num_beams', 64).value
-        v_ap = math.radians(p('vertical_aperture_deg', 20.0).value)
-        n_el = p('num_elevation_rays', 41).value
-        n_az = p('num_azimuth_rays', 3).value
-        self.range_min = p('range_min', 0.1).value
-        self.range_max = p('range_max', 10.0).value
-        self.noise = p('range_stddev', 0.02).value
+        self.organized = p('organized_cloud', False).value
+        d = SonarConfig()
+        cfg = SonarConfig(
+            horizontal_fov_deg=p('horizontal_fov_deg', d.horizontal_fov_deg).value,
+            num_beams=p('num_beams', d.num_beams).value,
+            vertical_fov_deg=p('vertical_fov_deg', d.vertical_fov_deg).value,
+            num_elevation_beams=p('num_elevation_beams', d.num_elevation_beams).value,
+            sub_rays_azimuth=p('sub_rays_azimuth', d.sub_rays_azimuth).value,
+            sub_rays_elevation=p('sub_rays_elevation', d.sub_rays_elevation).value,
+            range_min=p('range_min', d.range_min).value,
+            range_max=p('range_max', d.range_max).value,
+            range_stddev=p('range_stddev', d.range_stddev).value)
         # sonar_link pose in base_link (must match urdf/rov.urdf)
-        xyz = p('mount_xyz', [0.21, 0.0, -0.06]).value
-        rpy = p('mount_rpy', [0.0, 0.0, 0.0]).value
+        self.t_bs = np.array(p('mount_xyz', [0.21, 0.0, -0.06]).value, dtype=float)
+        self.R_bs = rpy_to_matrix(*p('mount_rpy', [0.0, 0.0, 0.0]).value)
 
         if not world_file:
             raise RuntimeError('world_file parameter is required')
         self.prims = load_world_primitives(world_file, exclude_models=exclude)
+        self.model = SonarModel(cfg)
+        self.cfg = cfg
         self.get_logger().info(
-            f'Sonar: {len(self.prims)} collision primitives from {world_file}; '
-            f'{self.n_beams} beams x {n_az}x{n_el} rays, '
-            f'{math.degrees(self.h_fov):.0f} deg fan, {self.range_max:.1f} m')
+            f'3D sonar: {len(self.prims)} collision primitives from {world_file}; '
+            f'{cfg.num_elevation_beams}x{cfg.num_beams} beams over '
+            f'{cfg.vertical_fov_deg:.0f}x{cfg.horizontal_fov_deg:.0f} deg, '
+            f'{self.model.num_rays} rays/scan, {cfg.range_max:.1f} m')
 
-        self.t_bs = np.array(xyz, dtype=float)
-        self.R_bs = rpy_to_matrix(*rpy)
-        self.rays_per_beam = n_az * n_el
-        self.dirs_sensor = fan_directions(self.h_fov, self.n_beams, v_ap, n_el, n_az)
-        self.rng = np.random.default_rng()
+        self.cloud_pub = self.create_publisher(PointCloud2, '/sensors/sonar/points', 10)
+        self.scan_pub = self.create_publisher(LaserScan, '/sensors/sonar', 10)
         self.latest = None
-
-        self.pub = self.create_publisher(LaserScan, '/sensors/sonar', 10)
         self.create_subscription(Odometry, '/odometry/ground_truth', self.on_odom, 10)
-        self.create_timer(1.0 / rate, self.scan)
         self.scan_time = 1.0 / rate
+        self.create_timer(self.scan_time, self.tick)
 
     def on_odom(self, msg):
         self.latest = msg
 
-    def scan(self):
+    def tick(self):
         if self.latest is None:
             return
         pose = self.latest.pose.pose
-        R_wb = quaternion_to_matrix(pose.orientation.x, pose.orientation.y,
-                                    pose.orientation.z, pose.orientation.w)
+        q = pose.orientation
+        R_wb = quaternion_to_matrix(q.x, q.y, q.z, q.w)
         t_wb = np.array([pose.position.x, pose.position.y, pose.position.z])
+        scan = self.model.scan(self.prims, t_wb + R_wb @ self.t_bs, R_wb @ self.R_bs)
 
-        R_ws = R_wb @ self.R_bs
-        origin = t_wb + R_wb @ self.t_bs
-        dirs = self.dirs_sensor @ R_ws.T
-        dist = cast(self.prims, np.broadcast_to(origin, dirs.shape), dirs)
+        header = self.latest.header
+        header.frame_id = self.frame
+        if self.organized:
+            n_el, n_az = self.model.shape
+            cloud = make_cloud(header, scan.points.reshape(-1, 3), n_el, n_az, dense=False)
+        else:
+            pts = scan.valid_points()
+            cloud = make_cloud(header, pts, 1, len(pts), dense=True)
+        self.cloud_pub.publish(cloud)
 
-        # Beam range = nearest echo across its elevation rays
-        ranges = dist.reshape(self.n_beams, self.rays_per_beam).min(axis=1)
-        hit = np.isfinite(ranges)
-        ranges[hit] += self.rng.normal(0.0, self.noise, int(hit.sum()))
-        ranges[ranges > self.range_max] = np.inf
-        ranges[hit & (ranges < self.range_min)] = -np.inf
-
-        msg = LaserScan()
-        msg.header.stamp = self.latest.header.stamp
-        msg.header.frame_id = self.frame
-        msg.angle_min = -self.h_fov / 2.0
-        msg.angle_max = self.h_fov / 2.0
-        msg.angle_increment = self.h_fov / max(self.n_beams - 1, 1)
-        msg.time_increment = 0.0
-        msg.scan_time = self.scan_time
-        msg.range_min = float(self.range_min)
-        msg.range_max = float(self.range_max)
-        msg.ranges = ranges.astype(np.float32).tolist()
-        self.pub.publish(msg)
+        ls = LaserScan()
+        ls.header = header
+        ls.angle_min = -self.model.h_fov / 2.0
+        ls.angle_max = self.model.h_fov / 2.0
+        ls.angle_increment = self.model.h_fov / max(self.cfg.num_beams - 1, 1)
+        ls.scan_time = self.scan_time
+        ls.range_min = float(self.cfg.range_min)
+        ls.range_max = float(self.cfg.range_max)
+        ls.ranges = scan.scan_2d().astype(np.float32).tolist()
+        self.scan_pub.publish(ls)
 
 
 def main():
