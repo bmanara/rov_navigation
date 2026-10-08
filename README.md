@@ -23,6 +23,7 @@ See [src/rov_bringup/README.md](src/rov_bringup/README.md) for the full topic/TF
   - `ros-jazzy-robot-localization`
   - `ros-jazzy-navigation2`
   - `ros-jazzy-teleop-twist-keyboard`
+  - `ros-jazzy-spatio-temporal-voxel-layer`
 - System packages: `libeigen3-dev`, `python3-numpy`, `python3-pytest`, `python3-yaml`
 
 # Installation
@@ -32,6 +33,7 @@ See [src/rov_bringup/README.md](src/rov_bringup/README.md) for the full topic/TF
 sudo apt update
 sudo apt install ros-jazzy-ros-gz ros-jazzy-robot-localization ros-jazzy-navigation2 \
   ros-jazzy-teleop-twist-keyboard libeigen3-dev python3-numpy python3-pytest python3-yaml
+sudo apt install ros-$ROS_DISTRO-spatio-temporal-voxel-layer # might be best to install from source instead of binary
 
 # Clone and build
 mkdir -p ~/ros2_jazzy_ws && cd ~/ros2_jazzy_ws
@@ -55,3 +57,18 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard   # in a second terminal
   `colcon build --symlink-install --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3`.
 - **C++ nodes die with `undefined symbol`**: another ROS distro was sourced when you built. Open a fresh terminal, source only `/opt/ros/jazzy/setup.bash`, delete `build/ install/`, and rebuild.
 - **Gazebo crashes on startup with Gazebo Jetty also installed**: pass `render_engine:=gz-rendering8-ogre2` to the launch file.
+
+---
+# Citations
+```
+@article{doi:10.1177/1729881420910530,
+    author = {Steve Macenski and David Tsai and Max Feinberg},
+    title ={Spatio-temporal voxel layer: A view on robot perception for the dynamic world},
+    journal = {International Journal of Advanced Robotic Systems},
+    volume = {17},
+    number = {2},
+    year = {2020},
+    doi = {10.1177/1729881420910530},
+    URL = {https://doi.org/10.1177/1729881420910530}
+}
+```
